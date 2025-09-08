@@ -1,0 +1,12 @@
+diff --git a/dom/base/ContentAreaDropListener.sys.mjs b/dom/base/ContentAreaDropListener.sys.mjs
+index 9f7bc50..c576e6e 100644
+--- a/dom/base/ContentAreaDropListener.sys.mjs
++++ b/dom/base/ContentAreaDropListener.sys.mjs
+@@ -227,6 +227,7 @@ ContentAreaDropListener.prototype = {
+   },
+ 
+   canDropLink(aEvent, aAllowSameDocument) {
++    return false;
+     if (this._eventTargetIsDisabled(aEvent)) {
+       return false;
+     }

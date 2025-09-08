@@ -1,0 +1,13 @@
+diff -up firefox-102.2.0/build/moz.configure/nss.configure.nss-version firefox-102.2.0/build/moz.configure/nss.configure
+--- firefox-102.2.0/build/moz.configure/nss.configure.nss-version	2022-08-23 18:17:14.699869558 +0200
++++ firefox-102.2.0/build/moz.configure/nss.configure	2022-08-23 18:15:33.790051448 +0200
+@@ -9,7 +9,7 @@ system_lib_option("--with-system-nss", h
+ imply_option("--with-system-nspr", True, when="--with-system-nss")
+ 
+ nss_pkg = pkg_check_modules(
+-    "NSS", "nss >= 3.79.1", when="--with-system-nss", config=False
++    "NSS", "nss >= 3.79", when="--with-system-nss", config=False
+ )
+ 
+ set_config("MOZ_SYSTEM_NSS", True, when="--with-system-nss")
+diff -up firefox-102.2.0/.nss-version firefox-102.2.0/

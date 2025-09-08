@@ -1,0 +1,25 @@
+diff --git a/parser/expat/lib/xmlparse.c b/parser/expat/lib/xmlparse.c
+--- a/parser/expat/lib/xmlparse.c
++++ b/parser/expat/lib/xmlparse.c
+@@ -5652,12 +5652,18 @@
+   else
+ #endif /* XML_DTD */
+   {
+     processor = contentProcessor;
+     /* see externalEntityContentProcessor vs contentProcessor */
+-    return doContent(parser, parentParser ? 1 : 0, encoding, s, end,
+-                     nextPtr, (XML_Bool)!ps_finalBuffer);
++    result = doContent(parser, parser->m_parentParser ? 1 : 0,
++                       parser->m_encoding, s, end, nextPtr,
++                       (XML_Bool)! parser->m_parsingStatus.finalBuffer);
++    if (result == XML_ERROR_NONE) {
++      if (! storeRawNames(parser))
++        return XML_ERROR_NO_MEMORY;
++    }
++    return result;
+   }
+ }
+ 
+ static enum XML_Error PTRCALL
+ errorProcessor(XML_Parser parser,
+

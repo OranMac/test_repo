@@ -1,0 +1,12 @@
+diff -up firefox-91.0/toolkit/components/extensions/schemas/runtime.json.mozilla-bmo1554971 firefox-91.0/toolkit/components/extensions/schemas/runtime.json
+--- firefox-91.0/toolkit/components/extensions/schemas/runtime.json.mozilla-bmo1554971	2021-07-29 17:20:08.523253193 +0200
++++ firefox-91.0/toolkit/components/extensions/schemas/runtime.json	2021-07-29 17:21:23.517498581 +0200
+@@ -64,7 +64,7 @@
+       {
+         "id": "PlatformArch",
+         "type": "string",
+-        "enum": ["aarch64", "arm", "ppc64", "s390x", "sparc64", "x86-32", "x86-64"],
++        "enum": ["aarch64", "arm", "ppc64", "ppc64le", "s390x", "sparc64", "x86-32", "x86-64"],
+         "allowedContexts": ["content", "devtools"],
+         "description": "The machine's processor architecture."
+       },

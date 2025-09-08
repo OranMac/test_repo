@@ -1,0 +1,632 @@
+diff --git a/security/manager/locales/en-US/security/certificates/certManager.ftl b/security/manager/locales/en-US/security/certificates/certManager.ftl
+--- a/security/manager/locales/en-US/security/certificates/certManager.ftl
++++ b/security/manager/locales/en-US/security/certificates/certManager.ftl
+@@ -51,9 +51,6 @@ certmgr-cert-name =
+ certmgr-cert-server =
+     .label = Server
+ 
+-certmgr-override-lifetime =
+-    .label = Lifetime
+-
+ certmgr-token-name =
+     .label = Security Device
+ 
+@@ -69,6 +66,9 @@ certmgr-email =
+ certmgr-serial =
+     .label = Serial Number
+ 
++certmgr-fingerprint-sha-256 =
++    .label = SHA-256 Fingerprint
++
+ certmgr-view =
+     .label = View…
+     .accesskey = V
+diff --git a/security/manager/pki/resources/content/certManager.js b/security/manager/pki/resources/content/certManager.js
+--- a/security/manager/pki/resources/content/certManager.js
++++ b/security/manager/pki/resources/content/certManager.js
+@@ -64,22 +64,16 @@ var serverRichList = {
+ 
+   buildRichList() {
+     let overrides = overrideService.getOverrides().map(item => {
+-      let cert = null;
+-      if (item.dbKey !== "") {
+-        cert = certdb.findCertByDBKey(item.dbKey);
+-      }
+       return {
+         hostPort: item.hostPort,
+-        dbKey: item.dbKey,
+         asciiHost: item.asciiHost,
+         port: item.port,
+         originAttributes: item.originAttributes,
+-        isTemporary: item.isTemporary,
+-        displayName: cert !== null ? cert.displayName : "",
++        fingerprint: item.fingerprint,
+       };
+     });
+     overrides.sort((a, b) => {
+-      let criteria = ["hostPort", "displayName"];
++      let criteria = ["hostPort", "fingerprint"];
+       for (let c of criteria) {
+         let res = a[c].localeCompare(b[c]);
+         if (res !== 0) {
+@@ -106,10 +100,10 @@ var serverRichList = {
+   _richBoxAddItem(item) {
+     let richlistitem = document.createXULElement("richlistitem");
+ 
+-    richlistitem.setAttribute("dbKey", item.dbKey);
+     richlistitem.setAttribute("host", item.asciiHost);
+     richlistitem.setAttribute("port", item.port);
+     richlistitem.setAttribute("hostPort", item.hostPort);
++    richlistitem.setAttribute("fingerprint", item.fingerprint);
+     richlistitem.setAttribute(
+       "originAttributes",
+       JSON.stringify(item.originAttributes)
+@@ -120,18 +114,7 @@ var serverRichList = {
+     hbox.setAttribute("equalsize", "always");
+ 
+     hbox.appendChild(createRichlistItem({ raw: item.hostPort }));
+-    hbox.appendChild(
+-      createRichlistItem(
+-        item.displayName !== ""
+-          ? { raw: item.displayName }
+-          : { l10nid: "no-cert-stored-for-override" }
+-      )
+-    );
+-    hbox.appendChild(
+-      createRichlistItem({
+-        l10nid: item.isTemporary ? "temporary-override" : "permanent-override",
+-      })
+-    );
++    hbox.appendChild(createRichlistItem({ raw: item.fingerprint }));
+ 
+     richlistitem.appendChild(hbox);
+ 
+@@ -170,32 +153,6 @@ var serverRichList = {
+     }
+   },
+ 
+-  viewSelectedRichListItem() {
+-    let selectedItem = this.richlist.selectedItem;
+-    if (!selectedItem) {
+-      return;
+-    }
+-
+-    let dbKey = selectedItem.getAttribute("dbKey");
+-    if (dbKey) {
+-      let cert = certdb.findCertByDBKey(dbKey);
+-      viewCertHelper(window, cert);
+-    }
+-  },
+-
+-  exportSelectedRichListItem() {
+-    let selectedItem = this.richlist.selectedItem;
+-    if (!selectedItem) {
+-      return;
+-    }
+-
+-    let dbKey = selectedItem.getAttribute("dbKey");
+-    if (dbKey) {
+-      let cert = certdb.findCertByDBKey(dbKey);
+-      exportToFile(window, cert);
+-    }
+-  },
+-
+   addException() {
+     let retval = {
+       exceptionAdded: false,
+@@ -212,16 +169,8 @@ var serverRichList = {
+   },
+ 
+   _setButtonState() {
+-    let websiteViewButton = document.getElementById("websites_viewButton");
+-    let websiteExportButton = document.getElementById("websites_exportButton");
+     let websiteDeleteButton = document.getElementById("websites_deleteButton");
+-
+-    let certKey = this.richlist.selectedItem?.getAttribute("dbKey");
+-    let cert = certKey && certdb.findCertByDBKey(certKey);
+-
+     websiteDeleteButton.disabled = this.richlist.selectedIndex < 0;
+-    websiteExportButton.disabled = !cert;
+-    websiteViewButton.disabled = websiteExportButton.disabled;
+   },
+ };
+ /**
+diff --git a/security/manager/pki/resources/content/certManager.xhtml b/security/manager/pki/resources/content/certManager.xhtml
+--- a/security/manager/pki/resources/content/certManager.xhtml
++++ b/security/manager/pki/resources/content/certManager.xhtml
+@@ -157,18 +157,13 @@
+
+            <listheader equalsize="always">
+              <treecol id="sitecol" data-l10n-id="certmgr-cert-server" primary="true" flex="1"/>
+-             <treecol id="certcol" data-l10n-id="certmgr-cert-name" flex="1"/>
+-             <treecol id="lifetimecol" data-l10n-id="certmgr-override-lifetime" flex="1"/>
++            <treecol id="sha256col" data-l10n-id="certmgr-fingerprint-sha-256" flex="1"/>
+            </listheader>
+            <richlistbox ondblclick="serverRichList.viewSelectedRichListItem();" class="certManagerRichlistBox" id="serverList" flex="1" selected="false"/>
+
+           <separator class="thin"/>
+
+           <hbox>
+-            <button id="websites_viewButton"
+-                    data-l10n-id="certmgr-view" oncommand="serverRichList.viewSelectedRichListItem();"/>
+-            <button id="websites_exportButton"
+-                    data-l10n-id="certmgr-export" oncommand="serverRichList.exportSelectedRichListItem();"/>
+             <button id="websites_deleteButton"
+                     data-l10n-id="certmgr-delete" oncommand="serverRichList.deleteSelectedRichListItem();"/>
+             <button id="websites_exceptionButton"
+diff --git a/security/manager/ssl/nsCertOverrideService.cpp b/security/manager/ssl/nsCertOverrideService.cpp
+--- a/security/manager/ssl/nsCertOverrideService.cpp
++++ b/security/manager/ssl/nsCertOverrideService.cpp
+@@ -106,8 +106,8 @@ nsCertOverride::GetAsciiHost(/*out*/ nsA
+ }
+ 
+ NS_IMETHODIMP
+-nsCertOverride::GetDbKey(/*out*/ nsACString& aDBKey) {
+-  aDBKey = mDBKey;
++nsCertOverride::GetFingerprint(/*out*/ nsACString& aFingerprint) {
++  aFingerprint = mFingerprint;
+   return NS_OK;
+ }
+ 
+@@ -118,12 +118,6 @@ nsCertOverride::GetPort(/*out*/ int32_t*
+ }
+ 
+ NS_IMETHODIMP
+-nsCertOverride::GetIsTemporary(/*out*/ bool* aIsTemporary) {
+-  *aIsTemporary = mIsTemporary;
+-  return NS_OK;
+-}
+-
+-NS_IMETHODIMP
+ nsCertOverride::GetHostPort(/*out*/ nsACString& aHostPort) {
+   nsCertOverrideService::GetHostWithPort(mAsciiHost, mPort, aHostPort);
+   return NS_OK;
+@@ -274,7 +268,6 @@ void nsCertOverrideService::RemoveAllTem
+   for (auto iter = mSettingsTable.Iter(); !iter.Done(); iter.Next()) {
+     nsCertOverrideEntry* entry = iter.Get();
+     if (entry->mSettings->mIsTemporary) {
+-      entry->mSettings->mCert = nullptr;
+       iter.Remove();
+     }
+   }
+@@ -297,18 +297,11 @@
+   nsAutoCString buffer;
+   bool isMore = true;
+ 
+-  /* file format is:
+-   *
+-   * host:port:originattributes \t fingerprint-algorithm \t fingerprint \t
+-   * override-mask \t dbKey
+-   *
+-   *   where override-mask is a sequence of characters,
+-   *     M meaning hostname-Mismatch-override
+-   *     U meaning Untrusted-override
+-   *     T meaning Time-error-override (expired/not yet valid)
+-   *
+-   * if this format isn't respected we move onto the next line in the file.
+-   */
++  // Each line is of the form:
++  // host:port:originAttributes \t sSHA256OIDString \t fingerprint \t
++  // There may be some "bits" identifiers and "dbKey" after the `fingerprint`
++  // field in 'fingerprint \t \t dbKey' format, but these are now ignored.
++  // Lines that don't match this form are silently dropped.
+ 
+   while (isMore && NS_SUCCEEDED(lineInputStream->ReadLine(buffer, &isMore))) {
+     if (buffer.IsEmpty() || buffer.First() == '#') {
+@@ -350,23 +343,10 @@
+         fingerprint.Length() == 0) {
+       continue;
+     }
+-    nsDependentCSubstring bitsString;
+-    if (!parser.ReadUntil(Tokenizer::Token::Whitespace(), bitsString) ||
+-        bitsString.Length() == 0) {
+-      continue;
+-    }
+-    nsDependentCSubstring dbKey;
+-    if (!parser.ReadUntil(Tokenizer::Token::EndOfFile(), dbKey) ||
+-        dbKey.Length() == 0) {
+-      continue;
+-    }
+-    nsCertOverride::OverrideBits bits;
+-    nsCertOverride::convertStringToBits(bitsString, bits);
+ 
+     AddEntryToList(host, port, attributes,
+-                   nullptr,  // don't have the cert
+-                   false,    // not temporary
+-                   fingerprint, bits, dbKey, aProofOfLock);
++                   false,  // not temporary
++                   fingerprint, aProofOfLock);
+   }
+ 
+   return NS_OK;
+@@ -412,9 +392,8 @@
+     output.Append(kTab);
+     output.Append(settings->mFingerprint);
+     output.Append(kTab);
+-    output.Append(bitsString);
+-    output.Append(kTab);
+-    output.Append(settings->mDBKey);
++    // the "bits" string used to go here, but it no longer exists
++    // the "\t dbKey" string used to go here, but it no longer exists
+     output.Append(NS_LINEBREAK);
+   }
+ 
+@@ -462,42 +441,16 @@
+     return NS_ERROR_FAILURE;
+   }
+ 
+-  nsAutoCString nickname;
+-  nsresult rv = DefaultServerNicknameForCert(nsscert.get(), nickname);
+-  if (!aTemporary && NS_SUCCEEDED(rv)) {
+-    UniquePK11SlotInfo slot(PK11_GetInternalKeySlot());
+-    if (!slot) {
+-      return NS_ERROR_FAILURE;
+-    }
+-
+-    // This can fail (for example, if we're in read-only mode). Luckily, we
+-    // don't even need it to succeed - we always match on the stored hash of the
+-    // certificate rather than the full certificate. It makes the display a bit
+-    // less informative (since we won't have a certificate to display), but it's
+-    // better than failing the entire operation.
+-    Unused << PK11_ImportCert(slot.get(), nsscert.get(), CK_INVALID_HANDLE,
+-                              nickname.get(), false);
+-  }
+-
+   nsAutoCString fpStr;
+-  rv = GetCertSha256Fingerprint(aCert, fpStr);
+-  if (NS_FAILED(rv)) {
+-    return rv;
+-  }
+-
+-  nsAutoCString dbkey;
+-  rv = aCert->GetDbKey(dbkey);
++  nsresult rv = GetCertSha256Fingerprint(aCert, fpStr);
+   if (NS_FAILED(rv)) {
+     return rv;
+   }
+ 
+   {
+     MutexAutoLock lock(mMutex);
+-    AddEntryToList(aHostName, aPort, aOriginAttributes,
+-                   aTemporary ? aCert : nullptr,
+-                   // keep a reference to the cert for temporary overrides
+-                   aTemporary, fpStr,
+-                   (nsCertOverride::OverrideBits)aOverrideBits, dbkey, lock);
++    AddEntryToList(aHostName, aPort, aOriginAttributes, aTemporary, fpStr,
++                   lock);
+     if (!aTemporary) {
+       Write(lock);
+     }
+@@ -532,10 +485,8 @@
+ 
+   MutexAutoLock lock(mMutex);
+   AddEntryToList(aHostName, aPort, aOriginAttributes,
+-                 nullptr,  // No cert to keep alive
+                  true,     // temporary
+-                 aCertFingerprint, (nsCertOverride::OverrideBits)aOverrideBits,
+-                 ""_ns,  // dbkey
++                 aCertFingerprint,
+                  lock);
+ 
+   return NS_OK;
+@@ -632,10 +583,8 @@
+ 
+ nsresult nsCertOverrideService::AddEntryToList(
+     const nsACString& aHostName, int32_t aPort,
+-    const OriginAttributes& aOriginAttributes, nsIX509Cert* aCert,
+-    const bool aIsTemporary, const nsACString& fingerprint,
+-    nsCertOverride::OverrideBits ob, const nsACString& dbKey,
+-    const MutexAutoLock& aProofOfLock) {
++    const OriginAttributes& aOriginAttributes, const bool aIsTemporary,
++    const nsACString& fingerprint, const MutexAutoLock& aProofOfLock) {
+   mMutex.AssertCurrentThreadOwns();
+   nsAutoCString keyString;
+   GetKeyString(aHostName, aPort, aOriginAttributes, keyString);
+@@ -656,11 +605,6 @@
+   settings->mOriginAttributes = aOriginAttributes;
+   settings->mIsTemporary = aIsTemporary;
+   settings->mFingerprint = fingerprint;
+-  settings->mOverrideBits = ob;
+-  settings->mDBKey = dbKey;
+-  // remove whitespace from stored dbKey for backwards compatibility
+-  settings->mDBKey.StripWhitespace();
+-  settings->mCert = aCert;
+   entry->mSettings = settings;
+ 
+   return NS_OK;
+diff --git a/security/manager/ssl/nsCertOverrideService.h b/security/manager/ssl/nsCertOverrideService.h
+--- a/security/manager/ssl/nsCertOverrideService.h
++++ b/security/manager/ssl/nsCertOverrideService.h
+@@ -43,8 +43,6 @@
+   bool mIsTemporary;  // true: session only, false: stored on disk
+   nsCString mFingerprint;
+   OverrideBits mOverrideBits;
+-  nsCString mDBKey;
+-  nsCOMPtr<nsIX509Cert> mCert;
+ 
+   static void convertBitsToString(OverrideBits ob, nsACString& str);
+   static void convertStringToBits(const nsACString& str, OverrideBits& ob);
+@@ -145,10 +143,8 @@
+   nsresult Write(const mozilla::MutexAutoLock& aProofOfLock);
+   nsresult AddEntryToList(const nsACString& host, int32_t port,
+                           const OriginAttributes& aOriginAttributes,
+-                          nsIX509Cert* aCert, const bool aIsTemporary,
++                          const bool aIsTemporary,
+                           const nsACString& fingerprint,
+-                          nsCertOverride::OverrideBits ob,
+-                          const nsACString& dbKey,
+                           const mozilla::MutexAutoLock& aProofOfLock);
+ 
+   // Set in constructor only
+diff --git a/security/manager/ssl/SSLServerCertVerification.cpp b/security/manager/ssl/SSLServerCertVerification.cpp
+--- a/security/manager/ssl/SSLServerCertVerification.cpp
++++ b/security/manager/ssl/SSLServerCertVerification.cpp
+@@ -791,8 +791,8 @@
+           aHostName, aPort, aOriginAttributes, aCert, &overrideBits,
+           &isTemporaryOverride, &haveOverride);
+       if (NS_SUCCEEDED(rv) && haveOverride) {
+-        // remove the errors that are already overriden
+-        remainingDisplayErrors &= ~overrideBits;
++        // remove all the errors
++        remainingDisplayErrors = 0;
+       }
+     }
+
+diff --git a/security/manager/ssl/nsICertOverrideService.idl b/security/manager/ssl/nsICertOverrideService.idl
+--- a/security/manager/ssl/nsICertOverrideService.idl
++++ b/security/manager/ssl/nsICertOverrideService.idl
+@@ -33,17 +33,6 @@ interface nsICertOverride : nsISupports 
+   readonly attribute int32_t port;
+ 
+   /**
+-  *   Whether or not the override is only used for this
+-  *   session (true) or stored persistently (false)
+-  */
+-  readonly attribute boolean isTemporary;
+-
+-  /**
+-  *   The database key for the associated certificate.
+-  */
+-  readonly attribute ACString dbKey;
+-
+-  /**
+   *   A combination of hostname and port in the form host:port.
+   *   Since the port can be -1 which is equivalent to port 433 we use an
+   *   existing function of nsCertOverrideService to create this property.
+@@ -51,6 +40,11 @@ interface nsICertOverride : nsISupports 
+   readonly attribute ACString hostPort;
+ 
+   /**
++  *   The fingerprint for the associated certificate.
++  */
++  readonly attribute ACString fingerprint;
++
++  /**
+   *   The origin attributes associated with this override.
+   */
+   [implicit_jscontext]
+diff --git a/security/manager/ssl/tests/mochitest/browser/browser_certificateManager.js b/security/manager/ssl/tests/mochitest/browser/browser_certificateManager.js
+--- a/security/manager/ssl/tests/mochitest/browser/browser_certificateManager.js
++++ b/security/manager/ssl/tests/mochitest/browser/browser_certificateManager.js
+@@ -27,9 +27,7 @@ async function checkServerCertificates(w
+ 
+   expectedValues.forEach((item, i) => {
+     let hostPort = labels[i * 3].value;
+-    let certString = labels[i * 3 + 1].value || labels[i * 3 + 1].textContent;
+-    let isTemporaryString =
+-      labels[i * 3 + 2].value || labels[i * 3 + 2].textContent;
++    let fingerprint = labels[i * 3 + 1].value || labels[i * 3 + 1].textContent;
+ 
+     Assert.equal(
+       hostPort,
+@@ -38,15 +36,9 @@ async function checkServerCertificates(w
+     );
+ 
+     Assert.equal(
+-      certString,
+-      item.certName,
+-      `Expected override to have field ${item.certName}`
+-    );
+-
+-    Assert.equal(
+-      isTemporaryString,
+-      item.isTemporary ? "Temporary" : "Permanent",
+-      `Expected override to be ${item.isTemporary ? "Temporary" : "Permanent"}`
++      fingerprint,
++      item.fingerprint,
++      `Expected override to have field ${item.fingerprint}`
+     );
+   });
+ }
+@@ -73,41 +73,6 @@
+   );
+ }
+ 
+-async function testViewButton(win) {
+-  win.document.getElementById("serverList").selectedIndex = 1;
+-
+-  Assert.ok(
+-    win.document.getElementById("websites_viewButton").disabled,
+-    "View button should be disabled for override without cert"
+-  );
+-
+-  win.document.getElementById("serverList").selectedIndex = 0;
+-
+-  Assert.ok(
+-    !win.document.getElementById("websites_viewButton").disabled,
+-    "View button should be enabled for override with cert"
+-  );
+-
+-  let loaded = BrowserTestUtils.waitForNewTab(gBrowser, null, true);
+-
+-  win.document.getElementById("websites_viewButton").click();
+-
+-  let newTab = await loaded;
+-  let spec = newTab.linkedBrowser.documentURI.spec;
+-
+-  Assert.ok(
+-    spec.startsWith("about:certificate"),
+-    "about:certificate should habe been opened"
+-  );
+-
+-  let newUrl = new URL(spec);
+-  let certEncoded = newUrl.searchParams.get("cert");
+-  let certDecoded = decodeURIComponent(certEncoded);
+-  Assert.ok(certDecoded, "should have some certificate as cert url param");
+-
+-  gBrowser.removeCurrentTab();
+-}
+-
+ add_task(async function test_cert_manager_server_tab() {
+   let win = await openCertManager();
+ 
+@@ -134,48 +99,13 @@
+   await checkServerCertificates(win, [
+     {
+       hostPort: "example.com:443",
+-      certName: "md5-ee",
+-      isTemporary: false,
+-    },
+-  ]);
+-
+-  win.document.getElementById("certmanager").acceptDialog();
+-  await BrowserTestUtils.windowClosed(win);
+-
+-  certOverrideService.rememberTemporaryValidityOverrideUsingFingerprint(
+-    "example.com",
+-    9999,
+-    {},
+-    "40:20:3E:57:FB:82:95:0D:3F:62:D7:04:39:F6:32:CC:B2:2F:70:9F:3E:66:C5:35:64:6E:49:2A:F1:02:75:9F",
+-    Ci.nsICertOverrideService.ERROR_UNTRUSTED
+-  );
+-
+-  win = await openCertManager();
+-
+-  await checkServerCertificates(win, [
+-    {
+-      hostPort: "example.com:443",
+-      certName: "md5-ee",
+-      isTemporary: false,
+-    },
+-    {
+-      hostPort: "example.com:9999",
+-      certName: "(Not Stored)",
+-      isTemporary: true,
++      fingerprint: cert.sha256Fingerprint,
+     },
+   ]);
+ 
+-  await testViewButton(win);
+-
+-  await deleteOverride(win, 2);
++  await deleteOverride(win, 1);
+ 
+-  await checkServerCertificates(win, [
+-    {
+-      hostPort: "example.com:9999",
+-      certName: "(Not Stored)",
+-      isTemporary: true,
+-    },
+-  ]);
++  await checkServerCertificates(win, []);
+ 
+   win.document.getElementById("certmanager").acceptDialog();
+   await BrowserTestUtils.windowClosed(win);
+diff --git a/security/manager/ssl/tests/unit/test_cert_override_read.js b/security/manager/ssl/tests/unit/test_cert_override_read.js
+--- a/security/manager/ssl/tests/unit/test_cert_override_read.js
++++ b/security/manager/ssl/tests/unit/test_cert_override_read.js
+@@ -11,19 +11,16 @@ function run_test() {
+   let cert1 = {
+     sha256Fingerprint:
+       "E9:3A:91:F6:15:11:FB:DD:02:76:DD:45:8C:4B:F4:9B:D1:14:13:91:2E:96:4B:EC:D2:4F:90:D5:F4:BB:29:5C",
+-    dbKey: "This isn't relevant for this test.",
+   };
+   // bad_certs/selfsigned.pem
+   let cert2 = {
+     sha256Fingerprint:
+       "51:BC:41:90:C1:FD:6E:73:18:19:B0:60:08:DD:A3:3D:59:B2:5B:FB:D0:3D:DD:89:19:A5:BB:C6:2B:5A:72:A7",
+-    dbKey: "This isn't relevant for this test.",
+   };
+   // bad_certs/noValidNames.pem
+   let cert3 = {
+     sha256Fingerprint:
+       "C3:A3:61:02:CA:64:CC:EC:45:1D:24:B6:A0:69:DB:DB:F0:D8:58:76:FC:50:36:52:5A:E8:40:4C:55:72:08:F4",
+-    dbKey: "This isn't relevant for this test.",
+   };
+ 
+   let profileDir = do_get_profile();
+@@ -35,58 +35,42 @@
+     "# This is a generated file!  Do not edit.",
+     "test.example.com:443:^privateBrowsingId=1\tOID.2.16.840.1.101.3.4.2.1\t" +
+       cert1.sha256Fingerprint +
+-      "\tM\t" +
+-      cert1.dbKey,
++      "\t",
+     "test.example.com:443:^privateBrowsingId=2\tOID.2.16.840.1.101.3.4.2.1\t" +
+       cert1.sha256Fingerprint +
++      "\t",
++    "test.example.com:443:^privateBrowsingId=3\tOID.2.16.840.1.101.3.4.2.1\t" + // includes bits and dbKey (now obsolete)
++      cert1.sha256Fingerprint +
+       "\tM\t" +
+-      cert1.dbKey,
++      "AAAAAAAAAAAAAAACAAAAFjA5MBQxEjAQBgNVBAMMCWxvY2FsaG9zdA==",
+     "example.com:443:\tOID.2.16.840.1.101.3.4.2.1\t" +
+       cert2.sha256Fingerprint +
+-      "\tU\t" +
+-      cert2.dbKey,
++      "\t",
+     "[::1]:443:\tOID.2.16.840.1.101.3.4.2.1\t" + // IPv6
+       cert2.sha256Fingerprint +
+-      "\tM\t" +
+-      cert2.dbKey,
++      "\t",
+     "old.example.com:443\tOID.2.16.840.1.101.3.4.2.1\t" + // missing attributes (defaulted)
+       cert1.sha256Fingerprint +
+-      "\tM\t" +
+-      cert1.dbKey,
++      "\t",
+     ":443:\tOID.2.16.840.1.101.3.4.2.1\t" + // missing host name
+       cert3.sha256Fingerprint +
+-      "\tU\t" +
+-      cert3.dbKey,
++      "\t",
+     "example.com::\tOID.2.16.840.1.101.3.4.2.1\t" + // missing port
+       cert3.sha256Fingerprint +
+-      "\tU\t" +
+-      cert3.dbKey,
+-    "example.com:443:\tOID.2.16.840.1.101.3.4.2.1\t" + // wrong fingerprint/dbkey
++      "\t",
++    "example.com:443:\tOID.2.16.840.1.101.3.4.2.1\t" + // wrong fingerprint
+       cert2.sha256Fingerprint +
+-      "\tU\t" +
+-      cert3.dbKey,
++      "\t",
+     "example.com:443:\tOID.0.00.000.0.000.0.0.0.0\t" + // bad OID
+       cert3.sha256Fingerprint +
+-      "\tU\t" +
+-      cert3.dbKey,
++      "\t",
+     "example.com:443:\t.0.0.0.0\t" + // malformed OID
+       cert3.sha256Fingerprint +
+-      "\tU\t" +
+-      cert3.dbKey,
++      "\t",
+     "example.com:443:\t\t" + // missing OID
+       cert3.sha256Fingerprint +
+-      "\tU\t" +
+-      cert3.dbKey,
+-    "example.com:443:\tOID.2.16.840.1.101.3.4.2.1\t" + // missing fingerprint
+-      "\tU\t" +
+-      cert3.dbKey,
+-    "example.com:443:\tOID.2.16.840.1.101.3.4.2.1\t" + // missing override bits
+-      cert3.sha256Fingerprint +
+-      "\t\t" +
+-      cert3.dbKey,
+-    "example.com:443:\tOID.2.16.840.1.101.3.4.2.1\t" + // missing dbkey
+-      cert3.sha256Fingerprint +
+-      "\tU\t",
++      "\t",
++    "example.com:443:\tOID.2.16.840.1.101.3.4.2.1\t", // missing fingerprint
+   ];
+   writeLinesAndClose(lines, outputStream);
+   let overrideService = Cc["@mozilla.org/security/certoverride;1"].getService(

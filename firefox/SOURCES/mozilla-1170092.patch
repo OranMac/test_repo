@@ -1,0 +1,98 @@
+diff -up firefox-91.0/extensions/pref/autoconfig/src/nsReadConfig.cpp.1170092 firefox-91.0/extensions/pref/autoconfig/src/nsReadConfig.cpp
+--- firefox-91.0/extensions/pref/autoconfig/src/nsReadConfig.cpp.1170092	2021-07-27 23:29:57.000000000 +0200
++++ firefox-91.0/extensions/pref/autoconfig/src/nsReadConfig.cpp	2021-07-29 16:20:44.164513998 +0200
+@@ -249,8 +249,20 @@ nsresult nsReadConfig::openAndEvaluateJS
+     if (NS_FAILED(rv)) return rv;
+ 
+     rv = NS_NewLocalFileInputStream(getter_AddRefs(inStr), jsFile);
+-    if (NS_FAILED(rv)) return rv;
++    if (NS_FAILED(rv)) {
++      // Look for cfg file in /etc/<application>/pref
++      rv = NS_GetSpecialDirectory(NS_APP_PREFS_SYSTEM_CONFIG_DIR,
++                                  getter_AddRefs(jsFile));
++      NS_ENSURE_SUCCESS(rv, rv);
++
++      rv = jsFile->AppendNative(nsLiteralCString("pref"));
++      NS_ENSURE_SUCCESS(rv, rv);
++      rv = jsFile->AppendNative(nsDependentCString(aFileName));
++      NS_ENSURE_SUCCESS(rv, rv);
+ 
++      rv = NS_NewLocalFileInputStream(getter_AddRefs(inStr), jsFile);
++      NS_ENSURE_SUCCESS(rv, rv);
++    }
+   } else {
+     nsAutoCString location("resource://gre/defaults/autoconfig/");
+     location += aFileName;
+diff -up firefox-91.0/modules/libpref/Preferences.cpp.1170092 firefox-91.0/modules/libpref/Preferences.cpp
+--- firefox-91.0/modules/libpref/Preferences.cpp.1170092	2021-07-27 23:30:34.000000000 +0200
++++ firefox-91.0/modules/libpref/Preferences.cpp	2021-07-29 16:20:44.166514005 +0200
+@@ -4553,6 +4553,8 @@ nsresult Preferences::InitInitialObjects
+   //
+   // Thus, in the omni.jar case, we always load app-specific default
+   // preferences from omni.jar, whether or not `$app == $gre`.
++  // At very end load configuration from system config location:
++  // - /etc/firefox/pref/*.js
+ 
+   nsresult rv = NS_ERROR_FAILURE;
+   UniquePtr<nsZipFind> find;
+diff -up firefox-91.0/toolkit/xre/nsXREDirProvider.cpp.1170092 firefox-91.0/toolkit/xre/nsXREDirProvider.cpp
+--- firefox-91.0/toolkit/xre/nsXREDirProvider.cpp.1170092	2021-07-27 23:30:56.000000000 +0200
++++ firefox-91.0/toolkit/xre/nsXREDirProvider.cpp	2021-07-29 16:26:20.071628932 +0200
+@@ -71,6 +71,7 @@
+ #endif
+ #ifdef XP_UNIX
+ #  include <ctype.h>
++#  include "nsIXULAppInfo.h"
+ #endif
+ #ifdef XP_IOS
+ #  include "UIKitDirProvider.h"
+@@ -550,6 +551,21 @@ nsXREDirProvider::GetFile(const char* aP
+       }
+     }
+   }
++
++#if defined(XP_UNIX)
++  if (!strcmp(aProperty, NS_APP_PREFS_SYSTEM_CONFIG_DIR)) {
++    nsCString sysConfigDir = nsLiteralCString("/etc/");
++    nsCOMPtr<nsIXULAppInfo> appInfo = do_GetService("@mozilla.org/xre/app-info;1");
++    if (!appInfo)
++      return NS_ERROR_NOT_AVAILABLE;
++    nsCString appName;
++    appInfo->GetName(appName);
++    ToLowerCase(appName);
++    sysConfigDir.Append(appName);
++    return NS_NewNativeLocalFile(sysConfigDir, false, aFile);
++  }
++#endif
++
+   if (NS_FAILED(rv) || !file) return NS_ERROR_FAILURE;
+ 
+   if (ensureFilePermissions) {
+@@ -827,6 +843,16 @@ nsresult nsXREDirProvider::GetFilesInter
+       LoadDirIntoArray(mXULAppDir, kAppendBackgroundTasksPrefDir, directories);
+     }
+ #endif
++    // Add /etc/<application>/pref/ directory if it exists
++    nsCOMPtr<nsIFile> systemPrefDir;
++    rv = NS_GetSpecialDirectory(NS_APP_PREFS_SYSTEM_CONFIG_DIR,
++                                getter_AddRefs(systemPrefDir));
++    if (NS_SUCCEEDED(rv)) {
++      rv = systemPrefDir->AppendNative(nsLiteralCString("pref"));
++      if (NS_SUCCEEDED(rv)) {
++        directories.AppendObject(systemPrefDir);
++      }
++    }
+ 
+     rv = NS_NewArrayEnumerator(aResult, directories, NS_GET_IID(nsIFile));
+   } else if (!strcmp(aProperty, NS_APP_CHROME_DIR_LIST)) {
+diff -up firefox-91.0/xpcom/io/nsAppDirectoryServiceDefs.h.1170092 firefox-91.0/xpcom/io/nsAppDirectoryServiceDefs.h
+--- firefox-91.0/xpcom/io/nsAppDirectoryServiceDefs.h.1170092	2021-07-27 23:31:38.000000000 +0200
++++ firefox-91.0/xpcom/io/nsAppDirectoryServiceDefs.h	2021-07-29 16:20:44.168514012 +0200
+@@ -59,6 +59,7 @@
+ #define NS_APP_PREFS_DEFAULTS_DIR_LIST "PrefDL"
+ #define NS_APP_PREFS_OVERRIDE_DIR \
+   "PrefDOverride"  // Directory for per-profile defaults
++#define NS_APP_PREFS_SYSTEM_CONFIG_DIR          "PrefSysConf"   // Directory with system-wide configuration
+ 
+ #define NS_APP_USER_PROFILE_50_DIR "ProfD"
+ #define NS_APP_USER_PROFILE_LOCAL_50_DIR "ProfLD"

@@ -1,0 +1,24 @@
+diff -up firefox-91.0.1/build/moz.configure/nspr.configure.nss-nspr-downgrade firefox-91.0.1/build/moz.configure/nspr.configure
+--- firefox-91.0.1/build/moz.configure/nspr.configure.nss-nspr-downgrade	2021-08-25 13:17:26.265307060 +0200
++++ firefox-91.0.1/build/moz.configure/nspr.configure	2021-08-25 13:17:28.161313632 +0200
+@@ -50,7 +50,7 @@ set_define("JS_WITHOUT_NSPR", True, when
+ def nspr_minver(js_standalone):
+     if js_standalone:
+         return "nspr >= 4.10"
+-    return "nspr >= 4.32"
++    return "nspr >= 4.31"
+ 
+ 
+ nspr_pkg = pkg_check_modules("NSPR", nspr_minver, when="--with-system-nspr")
+diff -up firefox-91.0.1/build/moz.configure/nss.configure.nss-nspr-downgrade firefox-91.0.1/build/moz.configure/nss.configure
+--- firefox-91.0.1/build/moz.configure/nss.configure.nss-nspr-downgrade	2021-08-25 13:17:45.049372175 +0200
++++ firefox-91.0.1/build/moz.configure/nss.configure	2021-08-25 13:17:37.763346918 +0200
+@@ -9,7 +9,7 @@ option("--with-system-nss", help="Use sy
+ imply_option("--with-system-nspr", True, when="--with-system-nss")
+ 
+ nss_pkg = pkg_check_modules(
+-    "NSS", "nss >= 3.68", when="--with-system-nss", config=False
++    "NSS", "nss >= 3.67", when="--with-system-nss", config=False
+ )
+ 
+ set_config("MOZ_SYSTEM_NSS", True, when="--with-system-nss")

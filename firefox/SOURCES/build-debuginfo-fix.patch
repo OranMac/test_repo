@@ -1,0 +1,24 @@
+diff -up firefox-91.0.1/third_party/libwebrtc/webrtc/modules/audio_processing/utility/ooura_fft.cc.debuginfo-fix firefox-91.0.1/third_party/libwebrtc/webrtc/modules/audio_processing/utility/ooura_fft.cc
+--- firefox-91.0.1/third_party/libwebrtc/webrtc/modules/audio_processing/utility/ooura_fft.cc.debuginfo-fix	2021-09-01 11:11:46.738285751 +0200
++++ firefox-91.0.1/third_party/libwebrtc/webrtc/modules/audio_processing/utility/ooura_fft.cc	2021-09-01 11:11:56.127319530 +0200
+@@ -21,7 +21,7 @@
+  *  be found in the AUTHORS file in the root of the source tree.
+  */
+ 
+-#include "modules/audio_processing//utility/ooura_fft.h"
++#include "modules/audio_processing/utility/ooura_fft.h"
+ 
+ #include <math.h>
+ 
+diff -up firefox-91.0.1/third_party/libwebrtc/webrtc/modules/audio_processing/utility/ooura_fft_sse2.cc.debuginfo-fix firefox-91.0.1/third_party/libwebrtc/webrtc/modules/audio_processing/utility/ooura_fft_sse2.cc
+--- firefox-91.0.1/third_party/libwebrtc/webrtc/modules/audio_processing/utility/ooura_fft_sse2.cc.debuginfo-fix	2021-09-01 11:12:26.513428847 +0200
++++ firefox-91.0.1/third_party/libwebrtc/webrtc/modules/audio_processing/utility/ooura_fft_sse2.cc	2021-09-01 11:12:32.117449009 +0200
+@@ -8,7 +8,7 @@
+  *  be found in the AUTHORS file in the root of the source tree.
+  */
+ 
+-#include "modules/audio_processing//utility/ooura_fft.h"
++#include "modules/audio_processing/utility/ooura_fft.h"
+ 
+ #include <emmintrin.h>
+ 

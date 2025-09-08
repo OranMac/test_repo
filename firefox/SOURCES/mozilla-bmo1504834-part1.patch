@@ -1,0 +1,77 @@
+diff -up firefox-78.0/gfx/2d/DrawTargetSkia.cpp.mozilla-bmo1504834-part1 firefox-78.0/gfx/2d/DrawTargetSkia.cpp
+--- firefox-78.0/gfx/2d/DrawTargetSkia.cpp.mozilla-bmo1504834-part1	2020-06-17 04:18:58.000000000 +0200
++++ firefox-78.0/gfx/2d/DrawTargetSkia.cpp	2020-06-25 16:52:29.824532769 +0200
+@@ -135,8 +135,7 @@ static IntRect CalculateSurfaceBounds(co
+   return surfaceBounds.Intersect(bounds);
+ }
+ 
+-static const int kARGBAlphaOffset =
+-    SurfaceFormat::A8R8G8B8_UINT32 == SurfaceFormat::B8G8R8A8 ? 3 : 0;
++static const int kARGBAlphaOffset = 0;  // Skia is always BGRA SurfaceFormat::A8R8G8B8_UINT32 == SurfaceFormat::B8G8R8A8 ? 3 : 0;
+ 
+ static bool VerifyRGBXFormat(uint8_t* aData, const IntSize& aSize,
+                              const int32_t aStride, SurfaceFormat aFormat) {
+diff -up firefox-78.0/gfx/2d/Types.h.mozilla-bmo1504834-part1 firefox-78.0/gfx/2d/Types.h
+--- firefox-78.0/gfx/2d/Types.h.mozilla-bmo1504834-part1	2020-06-25 16:52:29.826532776 +0200
++++ firefox-78.0/gfx/2d/Types.h	2020-06-25 16:55:02.942063616 +0200
+@@ -90,15 +90,8 @@ enum class SurfaceFormat : int8_t {
+ // The following values are endian-independent synonyms. The _UINT32 suffix
+ // indicates that the name reflects the layout when viewed as a uint32_t
+ // value.
+-#if MOZ_LITTLE_ENDIAN()
+   A8R8G8B8_UINT32 = B8G8R8A8,  // 0xAARRGGBB
+   X8R8G8B8_UINT32 = B8G8R8X8,  // 0x00RRGGBB
+-#elif MOZ_BIG_ENDIAN()
+-  A8R8G8B8_UINT32 = A8R8G8B8,  // 0xAARRGGBB
+-  X8R8G8B8_UINT32 = X8R8G8B8,  // 0x00RRGGBB
+-#else
+-#  error "bad endianness"
+-#endif
+ 
+   // The following values are OS and endian-independent synonyms.
+   //
+diff -up firefox-78.0/gfx/skia/skia/third_party/skcms/skcms.cc.mozilla-bmo1504834-part1 firefox-78.0/gfx/skia/skia/third_party/skcms/skcms.cc
+--- firefox-78.0/gfx/skia/skia/third_party/skcms/skcms.cc.mozilla-bmo1504834-part1	2020-06-17 04:18:58.000000000 +0200
++++ firefox-78.0/gfx/skia/skia/third_party/skcms/skcms.cc	2020-06-25 16:54:02.993855444 +0200
+@@ -30,6 +30,8 @@
+         #include <avx512fintrin.h>
+         #include <avx512dqintrin.h>
+     #endif
++#else
++    #define SKCMS_PORTABLE
+ #endif
+ 
+ // sizeof(x) will return size_t, which is 32-bit on some machines and 64-bit on others.
+@@ -280,20 +282,28 @@ enum {
+ static uint16_t read_big_u16(const uint8_t* ptr) {
+     uint16_t be;
+     memcpy(&be, ptr, sizeof(be));
+-#if defined(_MSC_VER)
+-    return _byteswap_ushort(be);
++#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++    return be;
+ #else
++    #if defined(_MSC_VER)
++    return _byteswap_ushort(be);
++    #else
+     return __builtin_bswap16(be);
++    #endif
+ #endif
+ }
+ 
+ static uint32_t read_big_u32(const uint8_t* ptr) {
+     uint32_t be;
+     memcpy(&be, ptr, sizeof(be));
+-#if defined(_MSC_VER)
+-    return _byteswap_ulong(be);
++#if __BYTE_ORDER == __ORDER_BIG_ENDIAN__
++    return be;
+ #else
++    #if defined(_MSC_VER)
++    return _byteswap_ulong(be);
++    #else
+     return __builtin_bswap32(be);
++    #endif
+ #endif
+ }
+ 

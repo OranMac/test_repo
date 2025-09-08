@@ -1,0 +1,27 @@
+diff -up firefox-68.1.0/js/xpconnect/src/XPCWrappedNative.cpp.ppc64le-inline firefox-68.1.0/js/xpconnect/src/XPCWrappedNative.cpp
+--- firefox-68.1.0/js/xpconnect/src/XPCWrappedNative.cpp.ppc64le-inline	2019-08-26 18:52:28.000000000 +0200
++++ firefox-68.1.0/js/xpconnect/src/XPCWrappedNative.cpp	2019-08-29 08:49:57.695687874 +0200
+@@ -1092,7 +1092,11 @@ class MOZ_STACK_CLASS CallMethodHelper f
+   MOZ_ALWAYS_INLINE bool GetOutParamSource(uint8_t paramIndex,
+                                            MutableHandleValue srcp) const;
+ 
++#if (__GNUC__ && __linux__ && __PPC64__ && _LITTLE_ENDIAN)
++  bool GatherAndConvertResults();
++#else
+   MOZ_ALWAYS_INLINE bool GatherAndConvertResults();
++#endif
+ 
+   MOZ_ALWAYS_INLINE bool QueryInterfaceFastPath();
+ 
+@@ -1139,7 +1143,11 @@ class MOZ_STACK_CLASS CallMethodHelper f
+ 
+   ~CallMethodHelper();
+ 
++#if (__GNUC__ && __linux__ && __PPC64__ && _LITTLE_ENDIAN)
++  bool Call();
++#else
+   MOZ_ALWAYS_INLINE bool Call();
++#endif
+ 
+   // Trace implementation so we can put our CallMethodHelper in a Rooted<T>.
+   void trace(JSTracer* aTrc);

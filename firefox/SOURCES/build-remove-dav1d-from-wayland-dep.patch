@@ -1,0 +1,49 @@
+diff -up firefox-102.0/media/ffvpx/config_common.h.dav1d-remove firefox-102.0/media/ffvpx/config_common.h
+--- firefox-102.0/media/ffvpx/config_common.h.dav1d-remove	2022-08-08 12:48:33.218128539 +0200
++++ firefox-102.0/media/ffvpx/config_common.h	2022-08-08 12:48:52.986003374 +0200
+@@ -24,15 +24,11 @@
+ #undef CONFIG_VP8_VAAPI_HWACCEL
+ #undef CONFIG_VP9_VAAPI_HWACCEL
+ #undef CONFIG_AV1_VAAPI_HWACCEL
+-#undef CONFIG_LIBDAV1D
+-#undef CONFIG_AV1_DECODER
+ #define CONFIG_VAAPI 1
+ #define CONFIG_VAAPI_1 1
+ #define CONFIG_VP8_VAAPI_HWACCEL 1
+ #define CONFIG_VP9_VAAPI_HWACCEL 1
+ #define CONFIG_AV1_VAAPI_HWACCEL 1
+-#define CONFIG_LIBDAV1D 1
+-#define CONFIG_AV1_DECODER 1
+ #endif
+ 
+ #endif
+diff -up firefox-102.0/media/ffvpx/libavcodec/moz.build.dav1d-remove firefox-102.0/media/ffvpx/libavcodec/moz.build
+--- firefox-102.0/media/ffvpx/libavcodec/moz.build.dav1d-remove	2022-08-08 12:44:24.098710736 +0200
++++ firefox-102.0/media/ffvpx/libavcodec/moz.build	2022-08-08 12:46:42.635828719 +0200
+@@ -104,17 +104,23 @@ if not CONFIG['MOZ_FFVPX_AUDIOONLY']:
+     ]
+     if CONFIG['MOZ_WAYLAND']:
+         LOCAL_INCLUDES += ['/media/mozva']
++        if CONFIG['MOZ_DAV1D_ASM']:
++            SOURCES += [
++                'libdav1d.c',
++            ]
+         SOURCES += [
+             'atsc_a53.c',
+-            'libdav1d.c',
+             'vaapi_av1.c',
+             'vaapi_decode.c',
+             'vaapi_vp8.c',
+             'vaapi_vp9.c',
+         ]
++        if CONFIG['MOZ_DAV1D_ASM']:
++            USE_LIBS += [
++                'dav1d',
++                'media_libdav1d_asm',
++            ]
+         USE_LIBS += [
+-          'dav1d',
+-          'media_libdav1d_asm',
+           'mozva'
+         ]
+ 

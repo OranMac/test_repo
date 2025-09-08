@@ -1,0 +1,70 @@
+diff -up firefox-91.0/widget/gtk/nsWindow.cpp.D110204-fscreen.diff firefox-91.0/widget/gtk/nsWindow.cpp
+--- firefox-91.0/widget/gtk/nsWindow.cpp.D110204-fscreen.diff	2021-07-27 23:31:38.000000000 +0200
++++ firefox-91.0/widget/gtk/nsWindow.cpp	2021-07-30 15:47:22.031795569 +0200
+@@ -91,6 +91,7 @@
+ #include "SystemTimeConverter.h"
+ #include "WidgetUtilsGtk.h"
+ #include "mozilla/X11Util.h"
++#include "nsIBrowserHandler.h"
+ 
+ #ifdef ACCESSIBILITY
+ #  include "mozilla/a11y/LocalAccessible.h"
+@@ -441,6 +442,7 @@ nsWindow::nsWindow()
+       mHasMappedToplevel(false),
+       mRetryPointerGrab(false),
+       mSizeState(nsSizeMode_Normal),
++      mPendingFullscreen(false),
+       mAspectRatio(0.0f),
+       mAspectRatioSaved(0.0f),
+       mLastScrollEventTime(GDK_CURRENT_TIME),
+@@ -4626,6 +4628,19 @@ void nsWindow::OnWindowStateEvent(GtkWid
+       ClearTransparencyBitmap();
+     }
+   }
++
++  // Hack to ensure window switched to fullscreen - avoid to fail when starting
++  // in kiosk mode
++  if (mPendingFullscreen &&
++      !(aEvent->new_window_state & GDK_WINDOW_STATE_FULLSCREEN)) {
++    LOG(
++        ("  Window should be fullscreen, but it's not, retrying set to "
++         "fullscreen.\n"));
++    MakeFullScreen(true);
++  } else {
++    LOG(("  Window successfully switched to fullscreen, happy now\n"));
++    mPendingFullscreen = false;
++  }
+ }
+ 
+ void nsWindow::OnDPIChanged() {
+@@ -6880,6 +6895,19 @@ nsresult nsWindow::MakeFullScreen(bool a
+       }
+     }
+ 
++    // if in kiosk, ensure the fullscreen is called
++    nsCOMPtr<nsIBrowserHandler> browserHandler =
++        do_GetService("@mozilla.org/browser/clh;1");
++    if (browserHandler) {
++      bool isKiosk;
++      browserHandler->GetKiosk(&isKiosk);
++      if (isKiosk) {
++        LOG(("  is kiosk, ensure the window switch to fullscreen\n"));
++        mPendingFullscreen = true;
++      }
++    } else {
++      LOG(("  Cannot find the browserHandler service.\n"));
++    }
+     gtk_window_fullscreen(GTK_WINDOW(mShell));
+   } else {
+     mSizeMode = mLastSizeMode;
+diff -up firefox-91.0/widget/gtk/nsWindow.h.D110204-fscreen.diff firefox-91.0/widget/gtk/nsWindow.h
+--- firefox-91.0/widget/gtk/nsWindow.h.D110204-fscreen.diff	2021-07-27 23:31:38.000000000 +0200
++++ firefox-91.0/widget/gtk/nsWindow.h	2021-07-29 18:35:41.000639386 +0200
+@@ -763,6 +763,7 @@ class nsWindow final : public nsBaseWidg
+    * move-to-rect callback we store it to mNewSizeAfterMoveToRect.
+    */
+   bool mWaitingForMoveToRectCallback;
++  bool mPendingFullscreen;
+   LayoutDeviceIntRect mNewSizeAfterMoveToRect;
+ 
+   /**

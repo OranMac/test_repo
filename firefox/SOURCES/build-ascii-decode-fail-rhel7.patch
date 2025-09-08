@@ -1,0 +1,45 @@
+diff -up firefox-102.0/third_party/python/PyYAML/lib3/yaml/reader.py.build-ascii-decode-fail-rhel7 firefox-102.0/third_party/python/PyYAML/lib3/yaml/reader.py
+--- firefox-102.0/third_party/python/PyYAML/lib3/yaml/reader.py.build-ascii-decode-fail-rhel7	2022-06-23 09:11:39.000000000 +0200
++++ firefox-102.0/third_party/python/PyYAML/lib3/yaml/reader.py	2022-08-16 13:24:31.697757209 +0200
+@@ -73,6 +73,8 @@ class Reader(object):
+             self.name = "<unicode string>"
+             self.check_printable(stream)
+             self.buffer = stream+'\0'
++            #self.encoding = 'utf-8'
++            #self.raw_decode = codecs.utf_8_decode
+         elif isinstance(stream, bytes):
+             self.name = "<byte string>"
+             self.raw_buffer = stream
+@@ -83,6 +85,11 @@ class Reader(object):
+             self.eof = False
+             self.raw_buffer = None
+             self.determine_encoding()
++        print("DEBUG_OUTPUT:")
++        print(self.name)
++        print(self.encoding)
++        print(self.stream)
++        #print(self.stream.read())
+ 
+     def peek(self, index=0):
+         try:
+diff -up firefox-102.0/toolkit/components/nimbus/generate/generate_feature_manifest.py.build-ascii-decode-fail-rhel7 firefox-102.0/toolkit/components/nimbus/generate/generate_feature_manifest.py
+--- firefox-102.0/toolkit/components/nimbus/generate/generate_feature_manifest.py.build-ascii-decode-fail-rhel7	2022-08-16 14:16:33.432529817 +0200
++++ firefox-102.0/toolkit/components/nimbus/generate/generate_feature_manifest.py	2022-08-17 08:01:38.175878171 +0200
+@@ -37,7 +37,7 @@ def generate_feature_manifest(fd, input_
+     write_fm_js_headers(fd)
+     nimbus_dir_path = pathlib.Path(input_file).parent
+     try:
+-        with open(input_file, "r") as yaml_input:
++        with open(input_file, "r", encoding="utf-8") as yaml_input:
+             data = yaml.safe_load(yaml_input)
+             with pathlib.Path(nimbus_dir_path, FEATURE_MANIFEST_SCHEMA).open() as f:
+                 schema = json.load(f)
+@@ -92,7 +92,7 @@ def generate_platform_feature_manifest(f
+         )
+ 
+     try:
+-        with open(input_file, "r") as yaml_input:
++        with open(input_file, "r", encoding="utf-8") as yaml_input:
+             data = yaml.safe_load(yaml_input)
+             fd.write(file_structure(data))
+     except (IOError) as e:
